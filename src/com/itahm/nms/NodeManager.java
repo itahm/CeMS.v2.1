@@ -10,8 +10,10 @@ import org.snmp4j.Snmp;
 import org.snmp4j.mp.MPv3;
 import org.snmp4j.security.AuthMD5;
 import org.snmp4j.security.AuthSHA;
+import org.snmp4j.security.PrivAES128;
+import org.snmp4j.security.PrivAES192;
+import org.snmp4j.security.PrivAES256;
 import org.snmp4j.security.PrivDES;
-import org.snmp4j.security.SecurityLevel;
 import org.snmp4j.security.SecurityModels;
 import org.snmp4j.security.SecurityProtocols;
 import org.snmp4j.security.USM;
@@ -55,26 +57,43 @@ public class NodeManager extends Snmp implements Listener, Closeable {
 		System.out.println("NodeManager up.");
 	}
 	
-	public void addUSMUser(String user, int level, String authProtocol, String authKey, String privProtocol, String privKey) {
-		switch (level) {
-		case SecurityLevel.AUTH_PRIV:
-			super.getUSM().addUser(new UsmUser(new OctetString(user),
-				authProtocol.equals("sha")? AuthSHA.ID: AuthMD5.ID,
-				new OctetString(authKey),
-				PrivDES.ID,
-				new OctetString(privKey)));
+	public void addUSMUser(String user, String authProto, String authKey, String privProto, String privKey) {
+		USM usm = super.getUSM();
+		System.out.format("%s\t%s\t%s\t%s\t%s\n", user, authProto,  authKey,  privProto,  privKey);
+		if (authProto == null || authKey == null) {
+			usm.addUser(new UsmUser(new OctetString(user), null, null, null, null));
+		} else {
+			OID auth = null;
 			
-			break;
-		case SecurityLevel.AUTH_NOPRIV:
-			super.getUSM().addUser(new UsmUser(new OctetString(user),
-					authProtocol.equals("sha")? AuthSHA.ID: AuthMD5.ID,
-				new OctetString(authKey),
-				null, null));
+			switch (authProto) {
+			case "sha":
+				auth = AuthSHA.ID;
+			case "md5":
+				auth = AuthMD5.ID;
+			}
 			
-			break;
-		default:
-			super.getUSM().addUser(new UsmUser(new OctetString(user),
-				null, null, null, null));	
+			if (auth == null) {
+				usm.addUser(new UsmUser(new OctetString(user), null, null, null, null));
+			} else {
+				OID priv = null;
+				
+				switch (privProto) {
+				case "des":
+					priv = PrivDES.ID;
+				case "aes128":
+					priv = PrivAES128.ID;
+				case "aes192":
+					priv = PrivAES192.ID;
+				case "aes256":
+					priv = PrivAES256.ID;
+				}
+				
+				if (priv == null || privKey == null) {
+					usm.addUser(new UsmUser(new OctetString(user), auth, new OctetString(authKey), null, null));
+				} else {
+					usm.addUser(new UsmUser(new OctetString(user), auth, new OctetString(authKey), priv, new OctetString(privKey)));
+				}
+			}
 		}
 	}
 	

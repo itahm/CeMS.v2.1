@@ -413,7 +413,7 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 						", protocol VARCHAR NOT NULL DEFAULT 'udp'"+
 						", port INT NOT NULL DEFAULT 161"+
 						", version INT NOT NULL DEFAULT 1"+
-						", security VARCHAR NOT NULL DEFAULT 'public'"+
+						", security VARCHAR NOT NULL UNIQUE DEFAULT 'public'"+
 						", level INT NOT NULL DEFAULT 0"+
 						", auth_protocol VARCHAR DEFAULT NULL"+
 						", auth_key VARCHAR DEFAULT NULL"+
@@ -886,37 +886,56 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 	}
 
 	@Override
-	public boolean addProfile(String name, JSONObject profile) {
-		long ttt = System.currentTimeMillis();
+	public boolean addProfile(String name, JSONObject profile) throws SQLException {
 		try (Connection c = this.connPool.getConnection()) {
+			try (PreparedStatement pstmt = c.prepareStatement("SELECT"+
+				" name"+
+				" FROM t_profile"+
+				" WHERE name=? OR security=?")) {
+				pstmt.setString(1, name);
+				pstmt.setString(2, profile.getString("security"));
+				
+				try (ResultSet rs = pstmt.executeQuery()) {
+					if (rs.next()) {
+						return false;
+					}
+				}
+			}
+			
 			try (PreparedStatement pstmt = c.prepareStatement("INSERT"+
 				" INTO t_profile"+
 				" (name, protocol, port, version, security, level, auth_protocol, auth_key, priv_protocol, priv_key)"+
 				" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")) {
+				String authProto, authKey, privProto, privKey;
+				
 				pstmt.setString(1, profile.getString("name"));
 				pstmt.setString(2, profile.getString("protocol"));
 				pstmt.setInt(3, profile.getInt("port"));
 				pstmt.setInt(4, profile.getInt("version"));
 				pstmt.setString(5, profile.getString("security"));
 				pstmt.setInt(6, profile.getInt("level"));
-				pstmt.setString(7, profile.has("authProtocol")? profile.getString("authProtocol"): null);
-				pstmt.setString(8, profile.has("authKey")? profile.getString("authKey"): null);
-				pstmt.setString(9, profile.has("privProtocol")? profile.getString("privProtocol"): null);
-				pstmt.setString(10, profile.has("privKey")? profile.getString("privKey"): null);
+				
+				authProto = profile.has("authProto")? profile.getString("authProto"): null;
+				pstmt.setString(7, authProto);
+				
+				authKey = profile.has("authKey")? profile.getString("authKey"): null;
+				pstmt.setString(8, authKey);
+				
+				privProto = profile.has("privProto")? profile.getString("privProto"): null;
+				pstmt.setString(9, privProto);
+				
+				privKey = profile.has("privKey")? profile.getString("privKey"): null;
+				pstmt.setString(10, privKey);
 				
 				pstmt.executeUpdate();
+				
+				if (profile.getInt("version") == 3) {
+					this.nodeManager.addUSMUser(profile.getString("security"), authProto, authKey, privProto, privKey);				
+				}
 			}
 			
 			return true;
-		} catch (SQLException sqle) {
-			sqle.printStackTrace();
-		} finally {
-			if (System.currentTimeMillis() - ttt > 30000) {
-				new Exception().printStackTrace();
-			}
 		}
-		
-		return false;
 	}
 
 	@Override
@@ -2112,12 +2131,13 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 		long ttt = System.currentTimeMillis();
 		try (Connection c = this.connPool.getConnection()) {
 			try (Statement stmt = c.createStatement()) {				
-				try (ResultSet rs = stmt.executeQuery("SELECT name, protocol, port, version, security, level, auth_protocol, auth_key, priv_protocol, priv_key"+
+				try (ResultSet rs = stmt.executeQuery("SELECT"+
+					" name, protocol, port, version, security, auth_protocol, auth_key, priv_protocol, priv_key, level"+
 					" FROM t_profile;")) {
 					JSONObject
 						profileData = new JSONObject(),
 						profile;
-					
+					String value;
 					while (rs.next()) {
 						profile = new JSONObject()
 							.put("name", rs.getString(1))
@@ -2125,22 +2145,30 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 							.put("port", rs.getInt(3))
 							.put("version", rs.getInt(4))
 							.put("security", rs.getString(5))
-							.put("level", rs.getInt(6));
+							.put("level", rs.getString(10));
 						
-						if (rs.getString(7) != null) {
-							profile.put("authProtocol", rs.getString(6));
+						value = rs.getString(6);
+						
+						if (!rs.wasNull()) {
+							profile.put("authProto", value);
 						}
 						
-						if (rs.getString(8) != null) {
-							profile.put("authKey", rs.getString(7));
+						value = rs.getString(7);
+						
+						if (!rs.wasNull()) {
+							profile.put("authKey", value);
 						}
 						
-						if (rs.getString(9) != null) {
-							profile.put("privProtocol", rs.getString(8));
+						value = rs.getString(8);
+						
+						if (!rs.wasNull()) {
+							profile.put("privProto", value);
 						}
 						
-						if (rs.getString(10) != null) {
-							profile.put("privKey", rs.getString(9));
+						value = rs.getString(9);
+						
+						if (!rs.wasNull()) {
+							profile.put("privKey", value);
 						}
 						
 						profileData.put(rs.getString(1), profile);
@@ -2160,7 +2188,8 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 	public JSONObject getProfile(String name) throws SQLException {
 		long ttt = System.currentTimeMillis();
 		try (Connection c = this.connPool.getConnection()) {
-			try (PreparedStatement pstmt = c.prepareStatement("SELECT protocol, port, version, security, level, auth_protocol, auth_key, priv_protocol, priv_key"+ 
+			try (PreparedStatement pstmt = c.prepareStatement("SELECT"+
+				" protocol, port, version, security, auth_protocol, auth_key, priv_protocol, priv_key, level"+ 
 				" FROM t_profile"+
 				" WHERE name=?;")) {
 				pstmt.setString(1, name);
@@ -2173,22 +2202,32 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 							.put("port", rs.getInt(2))
 							.put("version", rs.getInt(3))
 							.put("security", rs.getString(4))
-							.put("level", rs.getInt(5));
+							.put("level", rs.getString(9));
 						
-						if (rs.getString(6) != null) {
-							profile.put("authProtocol", rs.getString(5));
+						String value;
+						
+						value = rs.getString(5);
+						
+						if (!rs.wasNull()) {
+							profile.put("authProto", value);
 						}
 						
-						if (rs.getString(7) != null) {
-							profile.put("authKey", rs.getString(6));
+						value = rs.getString(6);
+						
+						if (!rs.wasNull()) {
+							profile.put("authKey", value);
 						}
 						
-						if (rs.getString(8) != null) {
-							profile.put("privProtocol", rs.getString(7));
+						value = rs.getString(7);
+						
+						if (!rs.wasNull()) {
+							profile.put("privProto", value);
 						}
 						
-						if (rs.getString(9) != null) {
-							profile.put("privKey", rs.getString(8));
+						value = rs.getString(8);
+						
+						if (!rs.wasNull()) {
+							profile.put("privKey", value);
 						}
 						
 						return profile;
@@ -3190,6 +3229,23 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 	public boolean removeProfile(String name) {
 		long ttt = System.currentTimeMillis();
 		try (Connection c = this.connPool.getConnection()) {
+			try (PreparedStatement pstmt = c.prepareStatement("SELECT"+
+				" level, security"+
+				" FROM t_profile"+
+				" WHERE name=?;")) {
+				pstmt.setString(1, name);
+				
+				try (ResultSet rs = pstmt.executeQuery()) {
+					if (rs.next()) {
+						if (rs.getInt(1) == 3) {
+							this.nodeManager.removeUSMUser(rs.getString(2));
+						}
+					} else {
+						return false;
+					}
+				}
+			}
+			
 			try (PreparedStatement pstmt = c.prepareStatement("DELETE"+
 				" FROM t_profile"+
 				" WHERE name=?;")) {
@@ -4219,11 +4275,11 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 		try (Connection c = this.connPool.getConnection()) {
 			try (Statement stmt = c.createStatement()) {
 				try (ResultSet rs = stmt.executeQuery("SELECT"+
-					" security, level, auth_protocol, auth_key, priv_protocol, priv_key"+
+					" security, auth_protocol, auth_key, priv_protocol, priv_key"+
 					" FROM t_profile"+
 					" WHERE version=3;")) {
 					while (rs.next()) {
-						this.nodeManager.addUSMUser(rs.getString(1), rs.getInt(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6));	
+						this.nodeManager.addUSMUser(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5));	
 					}
 				}
 			}
@@ -4254,14 +4310,12 @@ public class H2Agent implements Commander, NodeEventReceivable, Listener, Closea
 							switch(rs.getString(3).toUpperCase()) {
 							case "ICMP":
 								this.nodeManager.createNode(id,
-									new ICMPNode(id, rs.getString(2)),
-									rs.getBoolean(8));
+									new ICMPNode(id, rs.getString(2)), rs.getBoolean(8));
 								
 								break;
 							case "TCP":
 								this.nodeManager.createNode(id,
-									new TCPNode(id, rs.getString(2)),
-									rs.getBoolean(8));
+									new TCPNode(id, rs.getString(2)), rs.getBoolean(8));
 								
 								break;
 							case "SNMP":

@@ -91,7 +91,8 @@ public class Add implements Executor{
 		map.put("PROFILE", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
 				if (!agent.addProfile(request.getString("name"), request.getJSONObject("profile"))) {
 					response.setStatus(HttpServletResponse.SC_CONFLICT);
 				}

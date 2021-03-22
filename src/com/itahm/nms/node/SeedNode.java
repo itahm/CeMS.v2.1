@@ -14,6 +14,7 @@ import org.snmp4j.Target;
 import org.snmp4j.UserTarget;
 import org.snmp4j.event.ResponseEvent;
 import org.snmp4j.mp.SnmpConstants;
+import org.snmp4j.security.UsmUserEntry;
 import org.snmp4j.smi.Integer32;
 import org.snmp4j.smi.OID;
 import org.snmp4j.smi.OctetString;
@@ -127,14 +128,17 @@ public class SeedNode implements Runnable, Listenable {
 				public void test() {
 					Target<UdpAddress> target;
 					PDU request;
-					UdpAddress udp;
 					int version;
 					
+					for (UsmUserEntry ue : snmp.getUSM().getUserTable().getUserEntries()) {
+						System.out.println(ue.getUsmUser());
+					}
 					for (Profile profile: args) {
 						switch(profile.version) {
 						case 3:
 							target = new UserTarget<>();
-							
+							System.out.println(profile.security);
+							System.out.println(profile.level);
 							target.setSecurityName(new OctetString(profile.security));
 							target.setSecurityLevel(profile.level);
 							
@@ -171,13 +175,9 @@ public class SeedNode implements Runnable, Listenable {
 						request.setType(PDU.GETNEXT);
 						request.add(new VariableBinding(new OID("1.3.6.1.2.1")));
 						request.setRequestID(new Integer32(0));
-						
-						udp = new UdpAddress(profile.port);
 							
 						try {
-							udp.setInetAddress(InetAddress.getByName(ip));
-							
-							target.setAddress(udp);
+							target.setAddress(new UdpAddress(InetAddress.getByName(ip), profile.port));
 							
 							if (onResponse(snmp.send(request, target))) {
 								fireEvent(protocol, profile.name);

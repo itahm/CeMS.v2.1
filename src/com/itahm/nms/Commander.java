@@ -15,7 +15,7 @@ public interface Commander extends Closeable {
 	public boolean addLink(long path);
 	public JSONObject addNode(JSONObject node);
 	public boolean addPath(long nodeFrom, long nodeTo);
-	public boolean addProfile(String name, JSONObject profile);
+	public boolean addProfile(String name, JSONObject profile) throws SQLException;
 	public boolean addRack(JSONObject rack);
 	public boolean addUser(String id, JSONObject user) throws SQLException;
 	public void backup() throws Exception;
