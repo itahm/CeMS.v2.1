@@ -21,10 +21,11 @@ public class Add implements Executor{
 		map.put("BRANCH", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
-				if (!agent.addBranch(request.getJSONObject("branch"))) {
-					response.setStatus(HttpServletResponse.SC_CONFLICT);
-				}
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject branch = agent.addBranch(request.getJSONObject("branch"));
+				
+				response.write(branch);
 			}
 			
 		});
@@ -34,7 +35,21 @@ public class Add implements Executor{
 			@Override
 			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
 				throws SQLException {
-				agent.addFacility(request.getJSONObject("facility"));
+				JSONObject facility = agent.addFacility(request.getJSONObject("facility"));
+				
+				response.write(facility);
+			}
+			
+		});
+
+		map.put("GROUP", new Executor() {
+
+			@Override
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject group = agent.addGroup(request.getJSONObject("group"));
+				
+				response.write(group);
 			}
 			
 		});
@@ -42,9 +57,14 @@ public class Add implements Executor{
 		map.put("ICON", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
-				if (agent.addIcon(request.getString("type"), request.getJSONObject("icon")) == null) {
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject icon = agent.addIcon(request.getString("type"), request.getJSONObject("icon"));
+				
+				if (icon == null) {
 					response.setStatus(HttpServletResponse.SC_CONFLICT);
+				} else {
+					response.write(icon);
 				}
 			}
 			
@@ -53,10 +73,11 @@ public class Add implements Executor{
 		map.put("LINK", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
-				if (!agent.addLink(request.getLong("path"))) {
-					response.setStatus(HttpServletResponse.SC_CONFLICT);
-				}
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject link = agent.addLink(request.getLong("path"));
+					
+				response.write(link);
 			}
 			
 		});
@@ -64,15 +85,11 @@ public class Add implements Executor{
 		map.put("NODE", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
 				JSONObject node = agent.addNode(request.getJSONObject("node"));
 				
-				if (node == null) {
-					response.setStatus(HttpServletResponse.SC_CONFLICT);
-				}
-				else {
-					response.write(node);
-				}
+				response.write(node);
 			}
 			
 		});
@@ -80,9 +97,14 @@ public class Add implements Executor{
 		map.put("PATH", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
-				if (!agent.addPath(request.getLong("nodeFrom"), request.getLong("nodeTo"))) {
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject path = agent.addPath(request.getJSONObject("path"));
+				
+				if (path == null) {
 					response.setStatus(HttpServletResponse.SC_CONFLICT);
+				} else {
+					response.write(path);
 				}
 			}
 			
@@ -103,10 +125,11 @@ public class Add implements Executor{
 		map.put("RACK", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
-				if (!agent.addRack(request.getJSONObject("rack"))) {
-					response.setStatus(HttpServletResponse.SC_CONFLICT);
-				}
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject rack = agent.addRack(request.getJSONObject("rack"));
+				
+				response.write(rack);
 			}
 			
 		});
@@ -119,6 +142,18 @@ public class Add implements Executor{
 				if (!agent.addUser(request.getString("id"), request.getJSONObject("user"))) {
 					response.setStatus(HttpServletResponse.SC_CONFLICT);
 				}
+			}
+			
+		});
+		
+		map.put("VIEW", new Executor() {
+
+			@Override
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				JSONObject view = agent.addView(request.getJSONObject("view"));
+				
+				response.write(view);
 			}
 			
 		});

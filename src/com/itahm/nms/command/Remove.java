@@ -20,10 +20,9 @@ public class Remove implements Executor {
 		map.put("BRANCH", new Executor() {
 
 			@Override
-			public void execute(Response response, JSONObject request, JSONObject session, Connection connection) {
-				if (!agent.removeBranch(request.getLong("id"))) {
-					response.setStatus(HttpServletResponse.SC_CONFLICT);
-				}
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws JSONException, SQLException {
+				agent.removeBranch(request.getLong("id"));
 			}
 			
 		});
@@ -34,6 +33,16 @@ public class Remove implements Executor {
 			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
 				throws JSONException, SQLException {
 				agent.removeFacility(request.getLong("id"));
+			}
+			
+		});
+		
+		map.put("GROUP", new Executor() {
+
+			@Override
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws JSONException, SQLException {
+				agent.removeGroup(request.getLong("id"));
 			}
 			
 		});
@@ -122,11 +131,21 @@ public class Remove implements Executor {
 				throws SQLException {
 				String id = request.getString("id");
 				
-				if (session.getInt("level") > 0 || id.equals(session.getString("id"))) {
+				if (id.equals(session.getString("id"))) {
 					response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 				} else {
 					agent.removeUser(request.getString("id"));
 				}
+			}
+			
+		});
+		
+		map.put("VIEW", new Executor() {
+
+			@Override
+			public void execute(Response response, JSONObject request, JSONObject session, Connection connection)
+				throws SQLException {
+				agent.removeView(request.getString("user"), request.getLong("branch"));
 			}
 			
 		});
@@ -139,6 +158,8 @@ public class Remove implements Executor {
 		
 		if (executor == null) {
 			throw new JSONException("Target is not found.");
+		} else if (session.getInt("level") > 0) {
+			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 		} else {
 			executor.execute(response, request, session, connection);
 			

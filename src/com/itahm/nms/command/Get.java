@@ -93,6 +93,14 @@ public class Get implements Executor {
 			
 		});
 
+		map.put("GROUP", new Helper() {
+
+			@Override
+			public JSONObject execute(Response response, JSONObject request, Connection connection) throws SQLException {
+				return  agent.getGroup();
+			}
+			
+		});
 		
 		map.put("ICON", new Helper() {
 
@@ -193,7 +201,7 @@ public class Get implements Executor {
 			public JSONObject execute(Response response, JSONObject request, Connection connection) throws SQLException {
 				return request.has("id")?
 					agent.getNode(request.getLong("id"), request.has("resource") && request.getBoolean("resource")):
-					agent.getNode(request.has("filter")? request.getString("filter"): null);
+					agent.getNode();
 			}
 			
 		});
@@ -298,6 +306,15 @@ public class Get implements Executor {
 				return request.has("id")?
 					agent.getUser(request.getString("id")):
 					agent.getUser(false);
+			}
+			
+		});
+		
+		map.put("VIEW", new Helper() {
+
+			@Override
+			public JSONObject execute(Response response, JSONObject request, Connection connection) throws SQLException {
+				return agent.getView(request.getString("user"));
 			}
 			
 		});
